@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+	    <meta charset="utf-8">
+	    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+	    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+		<link rel="stylesheet" href="https://cache.amap.com/lbs/static/main1119.css"/>
+	</head>
+
+	<body>
+		<div id="container"></div>
+		<script src="https://webapi.amap.com/maps?v=1.4.15&key=您申请的key值&plugin=Map3D"></script>
+		<script src="./node_modules/three/build/three.js"></script>
+		<script src="./node_modules/three/examples/js/loaders/GLTFLoader.js"></script>
+		<script src="./node_modules/three/examples/js/loaders/DRACOLoader.js"></script>
+		<script>
+	    var map = new AMap.Map('container',{
+	        viewMode:'3D',
+	        showBuildingBlock:false,
+	        center:[116.472605,39.992075],
+	        pitch:55,
+	        zoom:14
+	    });
+        map.AmbientLight = new AMap.Lights.AmbientLight([1,1,1],1);
+    	map.DirectionLight = new AMap.Lights.DirectionLight([1,0,-0.5],[1,1,1],1);
+
+
+        var objLayer = new AMap.Object3DLayer();
+        map.add(objLayer);
+
+		var loadModel = function () {
+            const scene = new THREE.Scene();
+            const loader = new THREE.GLTFLoader();
+            // Draco 解码库
+            const dracoLoader = new THREE.DRACOLoader();
+            dracoLoader.setDecoderPath('./node_modules/three/examples/js/libs/draco/');
+
+            dracoLoader.preload();
+
+            loader.setDRACOLoader(dracoLoader);
+            
+            loader.load('./mox/huangDraco.gltf',
+                function(gltf) {
+                    callBack(gltf)
+                },
+                function(xhr) {
+                    console.log(`${(xhr.loaded / xhr.total) * 100}% loaded`);
+                },
+                function(xhr) {
+                    console.log(`${(xhr.loaded / xhr.total) * 100}% loaded`);
+                }
+            )
+            
+            function callBack(geometry) {
+                console.log(geometry)
+                var material = new THREE.MeshStandardMaterial( { color: 0x606060 } );
+                var mesh = new THREE.Mesh( geometry, material );
+                console.log(mesh)
+                // scene.add(mesh) 
+                var gaodeMesh = new AMap.Object3D.Mesh();
+
+                var meshes = [];
+                for (let i = 0; i < geometry.scenes.length; i++) {
+                    meshes.push(geometry.scenes[i].children[0])
+                }
+
+                for (let i = 0; i < meshes.length; i++) {
+                    var vecticesF3 = meshes[i].geometry.attributes.position;
+		            var vecticesNormal3 = meshes[i].geometry.attributes.normal;
+                    var vecticesUV2 = meshes[i].geometry.attributes.uv;
+                    console.log(vecticesF3, vecticesNormal3,vecticesUV2)
+
+                    var vectexCount =  vecticesF3.count;
+
+                    gaodeMesh = new AMap.Object3D.MeshAcceptLights();
+
+                    var amapGeometry = gaodeMesh.geometry;
+                    var c,opacity;
+
+                    var material = meshes[i].material[0]||meshes[i].material;
+
+		            // debugger
+		            // if(material.map)
+                    //     gaodeMesh.textures.push('https://a.amap.com/jsapi_demos/static/demo-center/model/1519/1519.bmp')
+                    
+                    c = material.color;
+                    opacity = material.opacity
+                    
+                    for(var j=0; j < vectexCount; j+=1){
+                        var s = j*3;
+		                amapGeometry.vertices.push(vecticesF3.array[s],vecticesF3.array[s+2],-vecticesF3.array[s+1]);
+		                
+		                if(vecticesNormal3) {
+                            amapGeometry.vertexNormals.push(vecticesNormal3.array[s],vecticesNormal3.array[s+2],-vecticesNormal3.array[s+1]);
+                        }
+                        
+		                if(vecticesUV2) {
+                            amapGeometry.vertexUVs.push(vecticesUV2.array[j*2],1-vecticesUV2.array[j*2+1]);
+		                }
+                        amapGeometry.vertexColors.push(c.r,c.g,c.b,opacity)
+                    }  
+
+                    gaodeMesh.DEPTH_TEST = material.depthTest
+		            mesh.backOrFront = 'both'
+		            gaodeMesh.transparent = opacity<1;
+		            gaodeMesh.scale(1000,1000,1000)
+		            gaodeMesh.rotateY(180)
+		            gaodeMesh.position(new AMap.LngLat(116.472605,39.992075))
+		            objLayer.add(gaodeMesh)
+                }
+                map.add(objLayer)
+                console.log(amapGeometry)
+            }
+        }
+		loadModel()
+		</script>
+	</body>
+</html>
